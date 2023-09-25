@@ -12,7 +12,7 @@ blocker_set "cookie" "in" "passMe"; # pass traffic just with cookie
 ## Settings
 
 ```
-blocker_set "user_agent|cookie" "ex(exclude)|in(incliude)" "patern_to_match";
+blocker_set "user_agent|cookie" "ex(exclude)|in(incliude)" "pattern_to_match";
 ```
 
 

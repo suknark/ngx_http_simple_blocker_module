@@ -5,7 +5,7 @@
 ## Example
 
 ```
-blocker_set "user_agent" "ex" "MyApp\/[1-5]"; # do not pass requests by user-agent matched regex
+blocker_set "user_agent" "ex" "MyApp/[1-5](\\.\\d+)*"; # do not pass requests by user-agent matched regex
 blocker_set "cookie" "in" "passMe"; # pass traffic just with cookie
 ```
 

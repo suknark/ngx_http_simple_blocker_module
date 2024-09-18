@@ -75,29 +75,36 @@ static ngx_int_t ngx_http_simple_blocker_module_handler(ngx_http_request_t *r)
 
     arcf = ngx_http_get_module_loc_conf(r, ngx_http_simple_blocker_module);
     
-    if (ngx_strncmp(arcf->match.data, (u_char *)"user_agent", arcf->match.len) == 0)
-    {
+    if (ngx_strncmp(arcf->match.data, (u_char *)"user_agent", arcf->match.len) == 0) {
 
         if (arcf == NULL || arcf->pattern.len == 0) {
             return NGX_DECLINED;
         }
 
+        if (r->headers_in.user_agent == NULL) {
+            return NGX_DECLINED;
+        }
+
         ngx_str_t user_agent_str = r->headers_in.user_agent->value;
+
+        // Log the pattern and user agent for debugging
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "regex pattern: %V", &arcf->pattern);
 
         ngx_regex_compile_t regex;
         ngx_int_t rc;
         ngx_regex_t *re;
 
-        ngx_str_t errstr = ngx_null_string;
+        u_char errstr[NGX_MAX_CONF_ERRSTR];
 
         ngx_memzero(&regex, sizeof(ngx_regex_compile_t));
         regex.pattern = arcf->pattern;
         regex.pool = r->pool;
         regex.err.len = NGX_MAX_CONF_ERRSTR;
-        regex.err.data = errstr.data;
+        regex.err.data = errstr;
 
         rc = ngx_regex_compile(&regex);
         if (rc != NGX_OK) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "regex compile error: %V", &regex.err);
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
@@ -105,31 +112,32 @@ static ngx_int_t ngx_http_simple_blocker_module_handler(ngx_http_request_t *r)
 
         rc = ngx_regex_exec(re, &user_agent_str, NULL, 0);
 
-        if (rc == 0 ) {
+        if (rc == 0) {
             if (ngx_strncmp(arcf->type.data, "ex", 2) == 0) {
                 return 444;
             } else {
                 return NGX_OK;
             }
-        } else {
+        } else if (rc == NGX_REGEX_NO_MATCHED) {
+            // No match found
             if (ngx_strncmp(arcf->type.data, "in", 2) == 0) {
                 return 444;
             } else {
                 return NGX_OK;
             }
+        } else {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "regex execution error: %i", rc);
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
-
-
     }
-
     if (ngx_strncmp(arcf->match.data, (u_char *)"cookie", arcf->match.len) == 0)
     {
 
 
-        ngx_int_t n;
+        ngx_table_elt_t *n;
         ngx_str_t cookie_value = ngx_string("*");
-        n = ngx_http_parse_multi_header_lines(&r->headers_in.cookies, &arcf->pattern, &cookie_value);
-        if (n != NGX_DECLINED) {
+        n = ngx_http_parse_multi_header_lines(r, r->headers_in.cookie, &arcf->pattern, &cookie_value);
+        if (n != NULL) {
             if (ngx_strncmp(arcf->type.data, "ex", 2) == 0) {
                 return 444;
             } else {
